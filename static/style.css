@@ -1,0 +1,8 @@
+.email-list .card {
+    border: 1px solid #ccc;
+    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.email-list .card-body {
+    padding: 20px;
+}

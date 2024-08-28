@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Classifier</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+<div class="container mt-4">
+    <h2>Email Classifier</h2>
+
+    <!-- Flash Messages Section -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="alert-container">
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} mt-2">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <div class="email-list">
+        {% for email in emails %}
+            <div class="card mt-2">
+                <div class="card-body">
+                    <h5 class="card-title">{{ email.subject }}</h5>
+                    <p class="card-text">{{ email.snippet }}</p>
+                    <button class="btn btn-link read-more-btn" data-email-id="{{ email.id }}">Read Full Email</button>
+                    <div class="full-email-content" style="display: none;">
+                        <h6>From: <span class="email-sender"></span></h6>
+                        <h6>Subject: <span class="email-subject"></span></h6>
+                        <p class="email-body"></p>
+                    </div>
+                    <button class="btn btn-primary classify-btn" data-snippet="{{ email.snippet }}">Classify</button>
+                    <div class="reply-section" style="display: none;">
+                        <p><strong>Classification:</strong> <span class="label"></span></p>
+                        <p><strong>Reply:</strong></p>
+                        <textarea class="form-control reply-body" rows="3"></textarea>
+                        <input type="hidden" class="to-email" value="{{ email.sender }}">
+                        <button class="btn btn-success send-reply-btn mt-2">Send Reply</button>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Scripts -->
+<!-- Include jQuery library before your custom scripts -->
+<script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+
+<script>
+    $(document).ready(function () {
+        // Classify button click event
+        $('.classify-btn').on('click', function () {
+            var emailSnippet = $(this).data('snippet');
+            var card = $(this).closest('.card');
+            $.ajax({
+                url: '/classify',
+                method: 'POST',
+                data: { snippet: emailSnippet },
+                success: function (response) {
+                    card.find('.label').text(response.label);
+                    card.find('.reply-body').val(response.reply);
+                    card.find('.reply-section').show();
+                },
+                error: function () {
+                    alert('Error classifying email');
+                }
+            });
+        });
+
+        // Send reply button click event
+        $('.send-reply-btn').on('click', function () {
+            var card = $(this).closest('.card');
+            var replyBody = card.find('.reply-body').val();
+            var toEmail = card.find('.to-email').val();
+            
+            // Clear previous alert messages
+            $('.alert-container').empty();
+
+            $.ajax({
+                url: '/send_reply',
+                method: 'POST',
+                data: {
+                    reply_body: replyBody,
+                    to_email: toEmail
+                },
+                success: function (response) {
+                    if (response.status === 'success') {
+                        $('.alert-container').html('<div class="alert alert-success mt-2">' + response.message + '</div>');
+                    } else {
+                        $('.alert-container').html('<div class="alert alert-danger mt-2">' + response.message + '</div>');
+                    }
+                },
+                error: function () {
+                    $('.alert-container').html('<div class="alert alert-danger mt-2">Failed to send reply!</div>');
+                }
+            });
+        });
+
+        // Read more button click event
+        $('.read-more-btn').on('click', function () {
+            var emailId = $(this).data('email-id');
+            var card = $(this).closest('.card');
+            var fullContentDiv = card.find('.full-email-content');
+
+            // If already expanded, collapse it
+            if (fullContentDiv.is(':visible')) {
+                fullContentDiv.slideUp();
+                return;
+            }
+
+            $.ajax({
+                url: '/fetch_email_content',
+                method: 'POST',
+                data: { email_id: emailId },
+                success: function (response) {
+                    if (response.error) {
+                        alert('Error fetching email: ' + response.error);
+                    } else {
+                        card.find('.email-sender').text(response.sender);
+                        card.find('.email-subject').text(response.subject);
+                        card.find('.email-body').text(response.body);
+                        fullContentDiv.slideDown();  // Slide down to reveal content
+                    }
+                },
+                error: function () {
+                    alert('Error fetching email content');
+                }
+            });
+        });
+    });
+</script>
+
+</body>
+</html>
